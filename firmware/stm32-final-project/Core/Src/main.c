@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
@@ -30,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define PI 3.14159265358979f
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -78,6 +79,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  BSP_ACCELERO_Init();
+  BSP_MAGNETO_Init();
 
   /* USER CODE END Init */
 
@@ -93,6 +96,15 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  int16_t acceleroVal[3];
+  int16_t magnetoVal[3];
+
+  float pitch = 0;
+  float roll = 0;
+  float yaw = 0;
+
+  char output[1000];
+  float deltaT = 0.1f;
 
   /* USER CODE END 2 */
 
@@ -103,6 +115,39 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  BSP_ACCELERO_AccGetXYZ(acceleroVal);
+	  BSP_MAGNETO_GetXYZ(magnetoVal);
+
+	  // Accelerometer calculations for pitch, roll, and yaw
+	     float ax = (float)acceleroVal[0];  // X-axis acceleration
+	     float ay = (float)acceleroVal[1];  // Y-axis acceleration
+	     float az = (float)acceleroVal[2];  // Z-axis acceleration
+
+	     float magX = (float)magnetoVal[0];
+	     float magY = (float)magnetoVal[1];
+	     float magZ = (float)magnetoVal[2];
+
+	     float accel_pitch_denom = sqrtf(ay * ay + az * az);
+	     float accel_roll_denom = sqrtf(ax * ax + az * az);
+
+	     float magXh = magX * cos(pitch) + magZ * sin(pitch);
+	     float magYh = magX * sin(roll) * sin(pitch) + magY * cos(roll) - magZ * sin(roll) * cos(pitch);
+
+	     // Using atan2f for better numerical stability
+	     pitch = atan2f(-ax, accel_pitch_denom) * (180.0f / PI);  // Convert to degrees
+	     roll = atan2f(ay, accel_roll_denom) * (180.0f / PI);     // Convert to degrees
+	     yaw = atan2f(-magYh, magXh) * 180.0f / M_PI;
+
+
+	     // Format and send output via UART
+	     sprintf(output, "Pitch: %.2f, Roll: %.2f, Yaw: %.2f\r\n",
+	    		 pitch, roll, yaw);
+
+	     uint16_t len = strlen(output);
+	     HAL_UART_Transmit(&huart1, (uint8_t*)output, len, 10000);
+
+	  HAL_Delay(100);
+
   }
   /* USER CODE END 3 */
 }
@@ -267,7 +312,6 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
