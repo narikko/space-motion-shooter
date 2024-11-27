@@ -31,7 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define PI 3.14159265358979f
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -81,6 +81,7 @@ int main(void)
   /* USER CODE BEGIN Init */
   BSP_ACCELERO_Init();
   BSP_MAGNETO_Init();
+  BSP_GYRO_Init();
 
   /* USER CODE END Init */
 
@@ -98,12 +99,17 @@ int main(void)
   /* USER CODE BEGIN 2 */
   int16_t acceleroVal[3];
   int16_t magnetoVal[3];
+  float gyroVal[3];
 
-  float pitch;
-  float roll;
-  float yaw;
+  float pitch, roll, yaw;
+
+  float gpitch, groll, gyaw;
 
   char output[1000];
+
+  float dt;
+  uint32_t lastTime = 0;
+  uint32_t currentTime;
 
   /* USER CODE END 2 */
 
@@ -116,26 +122,32 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  BSP_ACCELERO_AccGetXYZ(acceleroVal);
 	  BSP_MAGNETO_GetXYZ(magnetoVal);
+	  BSP_GYRO_GetXYZ(gyroVal);
+
+	  currentTime = HAL_GetTick();
+	  dt = (float)(currentTime - lastTime) / 1000.0f;
+	  lastTime = currentTime;
 
 	  float ax = (float)acceleroVal[0];
 	  float ay = (float)acceleroVal[1];
 	  float az = (float)acceleroVal[2];
 
-	  float magX = (float)magnetoVal[0];
-	  float magY = (float)magnetoVal[1];
-	  float magZ = (float)magnetoVal[2];
+	  float gx = (float)gyroVal[0] * (PI / 180.0f);  // Convert to radians/s
+	  float gy = (float)gyroVal[1] * (PI / 180.0f);  // Convert to radians/s
+	  float gz = (float)gyroVal[2] * (PI / 180.0f);  // Convert to radians/s
 
 	  float pitch_denom = sqrtf(ay * ay + az * az);
 	  float roll_denom = sqrtf(ax * ax + az * az);
 
-	  float magXh = magX * cos(pitch) + magZ * sin(pitch);
-	  float magYh = magX * sin(roll) * sin(pitch) + magY * cos(roll) - magZ * sin(roll) * cos(pitch);
-
 	  pitch = atan2f(-ax, pitch_denom) * (180.0f / PI);
 	  roll = atan2f(ay, roll_denom) * (180.0f / PI);
-	  yaw = atan2f(-magYh, magXh) * 180.0f / M_PI;
 
-	  sprintf(output, "Pitch: %.2f, Roll: %.2f, Yaw: %.2f\r\n", pitch, roll, yaw);
+	  gpitch += gy * dt;
+	  groll  += gx * dt;
+	  gyaw   += gz * dt;
+
+	  sprintf(output, "APitch: %.2f, ARoll: %.2f, AYaw: %.2f\r\nGPitch: %.2f, GRoll: %.2f, GYaw: %.2f\r\n",
+			  pitch, roll, yaw, gpitch, groll, gyaw);
 
 	  int16_t len = strlen(output);
 	  HAL_UART_Transmit(&huart1, (uint8_t*)output, len, 10000);
