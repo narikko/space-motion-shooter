@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
+#include "calibrate_gyro.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -103,13 +104,18 @@ int main(void)
 
   float pitch, roll, yaw;
 
-  float gpitch, groll, gyaw;
+  float gpitch = 0, groll = 0, gyaw = 0;
 
   char output[1000];
 
   float dt;
   uint32_t lastTime = 0;
   uint32_t currentTime;
+
+  int G_So = 70;
+  float gyro_offset[3];
+
+  calibrate(gyro_offset);
 
   /* USER CODE END 2 */
 
@@ -132,15 +138,15 @@ int main(void)
 	  float ay = (float)acceleroVal[1];
 	  float az = (float)acceleroVal[2];
 
-	  float gx = (float)gyroVal[0] * (PI / 180.0f);  // Convert to radians/s
-	  float gy = (float)gyroVal[1] * (PI / 180.0f);  // Convert to radians/s
-	  float gz = (float)gyroVal[2] * (PI / 180.0f);  // Convert to radians/s
+	  float gx = ((float)gyroVal[0] - gyro_offset[0]) / G_So;
+	  float gy = ((float)gyroVal[1] - gyro_offset[1]) / G_So;
+	  float gz = ((float)gyroVal[2] - gyro_offset[2]) / G_So;
 
 	  float pitch_denom = sqrtf(ay * ay + az * az);
 	  float roll_denom = sqrtf(ax * ax + az * az);
 
-	  pitch = atan2f(-ax, pitch_denom) * (180.0f / PI);
-	  roll = atan2f(ay, roll_denom) * (180.0f / PI);
+	  pitch = atan2f(-ax, pitch_denom) * (180.0f / M_PI);
+	  roll = atan2f(ay, roll_denom) * (180.0f / M_PI);
 
 	  gpitch += gy * dt;
 	  groll  += gx * dt;
