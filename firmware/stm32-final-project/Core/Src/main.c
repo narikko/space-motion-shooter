@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
 #include "calibrate_gyro.h"
+#include "kalman_filter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -81,8 +82,6 @@ int main(void)
 
   /* USER CODE BEGIN Init */
   BSP_ACCELERO_Init();
-  BSP_MAGNETO_Init();
-  BSP_GYRO_Init();
 
   /* USER CODE END Init */
 
@@ -99,23 +98,20 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   int16_t acceleroVal[3];
-  int16_t magnetoVal[3];
-  float gyroVal[3];
 
-  float pitch, roll, yaw;
+  float pitch, roll;
 
-  float gpitch = 0, groll = 0, gyaw = 0;
+  char output[100];
 
-  char output[1000];
-
-  float dt;
-  uint32_t lastTime = 0;
-  uint32_t currentTime;
-
-  int G_So = 70;
-  float gyro_offset[3];
-
-  calibrate(gyro_offset);
+  struct kstate {
+      float q;
+      float r;
+      float x;
+      float p;
+      float k;
+  };
+  struct kstate roll_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
+  struct kstate pitch_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
 
   /* USER CODE END 2 */
 
@@ -127,20 +123,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  BSP_ACCELERO_AccGetXYZ(acceleroVal);
-	  BSP_MAGNETO_GetXYZ(magnetoVal);
-	  BSP_GYRO_GetXYZ(gyroVal);
-
-	  currentTime = HAL_GetTick();
-	  dt = (float)(currentTime - lastTime) / 1000.0f;
-	  lastTime = currentTime;
 
 	  float ax = (float)acceleroVal[0];
 	  float ay = (float)acceleroVal[1];
 	  float az = (float)acceleroVal[2];
-
-	  float gx = ((float)gyroVal[0] - gyro_offset[0]) / G_So;
-	  float gy = ((float)gyroVal[1] - gyro_offset[1]) / G_So;
-	  float gz = ((float)gyroVal[2] - gyro_offset[2]) / G_So;
 
 	  float pitch_denom = sqrtf(ay * ay + az * az);
 	  float roll_denom = sqrtf(ax * ax + az * az);
@@ -148,18 +134,18 @@ int main(void)
 	  pitch = atan2f(-ax, pitch_denom) * (180.0f / M_PI);
 	  roll = atan2f(ay, roll_denom) * (180.0f / M_PI);
 
-	  gpitch += gy * dt;
-	  groll  += gx * dt;
-	  gyaw   += gz * dt;
+	  kalmanFilter_update(&roll_filter, roll);
+	  kalmanFilter_update(&pitch_filter, pitch);
 
-	  sprintf(output, "APitch: %.2f, ARoll: %.2f, AYaw: %.2f\r\nGPitch: %.2f, GRoll: %.2f, GYaw: %.2f\r\n",
-			  pitch, roll, yaw, gpitch, groll, gyaw);
+	  roll = roll_filter.x;
+	  pitch = pitch_filter.x;
+
+	  sprintf(output, "Roll: %.2f, Pitch: %.2f\r\n", roll, pitch);
 
 	  int16_t len = strlen(output);
 	  HAL_UART_Transmit(&huart1, (uint8_t*)output, len, 10000);
 
 	  HAL_Delay(100);
-
   }
   /* USER CODE END 3 */
 }

@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <fenv.h>
-#include "KalmanFilter_C.h"
-
 
 struct kstate {
     float q;
@@ -11,7 +9,7 @@ struct kstate {
     float k;
 };
 
-int kalmanFilter_C_update(float measurement, struct kstate* kstate){
+int kalmanFilter_update(struct kstate* kstate, float measurement){
 	// Clear all floating-point exceptions before starting calculations
 	feclearexcept(FE_ALL_EXCEPT);
 
@@ -45,6 +43,11 @@ int kalmanFilter_C_update(float measurement, struct kstate* kstate){
 	kstate->x = x;
 	kstate->k = k;
 	kstate->p = p;
+
+	// Check for floating-point exceptions after all operations
+	if (fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW)) {
+		return -1;
+	}
 
 	return 0;
 }
