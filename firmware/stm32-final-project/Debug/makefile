@@ -85,8 +85,8 @@ all: main-build
 main-build: stm32-final-project.elf secondary-outputs
 
 # Tool invocations
-stm32-final-project.elf stm32-final-project.map: $(OBJS) $(USER_OBJS) D:\space-motion-shooter\firmware\stm32-final-project\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "stm32-final-project.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\space-motion-shooter\firmware\stm32-final-project\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="stm32-final-project.map" -Wl,--gc-sections -static -L"D:\space-motion-shooter\firmware\stm32-final-project\Core\Lib" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
+stm32-final-project.elf stm32-final-project.map: $(OBJS) $(USER_OBJS) C:\Users\nh_14\OneDrive\Documents\tremor-detector\space-motion-shooter\firmware\stm32-final-project\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "stm32-final-project.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\nh_14\OneDrive\Documents\tremor-detector\space-motion-shooter\firmware\stm32-final-project\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="stm32-final-project.map" -Wl,--gc-sections -static -L"C:\Users\nh_14\OneDrive\Documents\tremor-detector\space-motion-shooter\firmware\stm32-final-project\Core\Lib" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
