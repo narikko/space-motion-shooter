@@ -48,11 +48,20 @@ DMA_HandleTypeDef hdma_dac1_ch1;
 I2C_HandleTypeDef hi2c2;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint32_t sineWave[42];
+uint32_t sawtoothWave_1[110];
+uint32_t sawtoothWave_2[55];
+uint32_t sawtoothWave_3[28];
+uint32_t* waves[] = {sawtoothWave_1, sawtoothWave_2, sawtoothWave_3};
+int sizes[3] = {110, 55, 28};
+int buttonPressed = 0;
+uint16_t BTN_Pin = GPIO_PIN_13;
+int playSound;
+int wave;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,23 +72,41 @@ static void MX_I2C2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_DAC1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-    if (GPIO_Pin == BTN_Pin){
-
-    	int size = sizeof(sineWave_1) / sizeof(sineWave_1[0]);
-    	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sineWave, size, DAC_ALIGN_12B_R);
-    	HAL_Delay(200);
-    	HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
-
-
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == BTN_Pin) {
+        if (HAL_GPIO_ReadPin(GPIOC, BTN_Pin) == GPIO_PIN_RESET) {
+            buttonPressed = 1;
+            HAL_TIM_Base_Start_IT(&htim3);
+        } else {
+            buttonPressed = 0;
+            HAL_TIM_Base_Stop_IT(&htim3);
+            HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+        }
     }
 }
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim == &htim3 && buttonPressed) {
+        if (playSound) {
+            HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+            playSound = 0;
+        } else {
+        	wave = (wave + 1) % 3;
+        	uint32_t* sawtoothWave = waves[wave];
+            int size = sizes[wave];
+            HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sawtoothWave, size, DAC_ALIGN_12B_R);
+            playSound = 1;
+        }
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -117,6 +144,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_DAC1_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   int16_t acceleroVal[3];
 
@@ -134,13 +162,26 @@ int main(void)
   struct kstate roll_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
   struct kstate pitch_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
 
-  for (uint32_t k = 0; k < 42; k++){
-        float rad = 2.0f * 3.14f * k / 42.0f;
-        sineWave[k] = (uint32_t) roundf(1365.0f * (1.0f + arm_sin_f32(rad)));
-    }
+  for (uint32_t j = 0; j < 110; j++){
+	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
+	  sawtoothWave_1[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  }
+
+  for (uint32_t j = 0; j < 55; j++){
+  	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
+  	  sawtoothWave_2[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  }
+
+  for (uint32_t j = 0; j < 28; j++){
+  	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
+  	  sawtoothWave_3[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  }
+
+
 
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-
+  HAL_TIM_Base_Start_IT(&htim2);
+  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -168,7 +209,7 @@ int main(void)
 	  roll = roll_filter.x;
 	  pitch = pitch_filter.x;
 
-	  sprintf(output, "Roll: %.2f, Pitch: %.2f\r\n", roll, pitch);
+	  sprintf(output, "Roll: %.2f, Pitch: %.2f, Button: %d\r\n", roll, pitch, buttonPressed);
 
 	  int16_t len = strlen(output);
 	  HAL_UART_Transmit(&huart1, (uint8_t*)output, len, 10000);
@@ -366,6 +407,51 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 11999;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 1000;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -451,7 +537,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
