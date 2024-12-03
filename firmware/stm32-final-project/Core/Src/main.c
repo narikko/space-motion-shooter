@@ -52,7 +52,7 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+uint32_t sineWave[42];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,7 +69,17 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+    if (GPIO_Pin == BTN_Pin){
 
+    	int size = sizeof(sineWave_1) / sizeof(sineWave_1[0]);
+    	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sineWave, size, DAC_ALIGN_12B_R);
+    	HAL_Delay(200);
+    	HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+
+
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -123,6 +133,13 @@ int main(void)
   };
   struct kstate roll_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
   struct kstate pitch_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
+
+  for (uint32_t k = 0; k < 42; k++){
+        float rad = 2.0f * 3.14f * k / 42.0f;
+        sineWave[k] = (uint32_t) roundf(1365.0f * (1.0f + arm_sin_f32(rad)));
+    }
+
+  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
   /* USER CODE END 2 */
 
