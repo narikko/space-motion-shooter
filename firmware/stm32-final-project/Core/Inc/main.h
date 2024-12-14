@@ -31,12 +31,21 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+struct kstate {
+    float q;  // Process noise covariance
+    float r;  // Measurement noise covariance
+    float x;  // Estimated state
+    float p;  // Estimated error covariance
+    float k;  // Kalman gain
+};
 
+int kalmanFilter_C_update(float measurement, struct kstate* kstate);
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
