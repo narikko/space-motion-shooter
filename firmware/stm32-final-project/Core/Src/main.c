@@ -81,13 +81,16 @@ static void MX_TIM3_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == BTN_Pin) {
+    	// When pushbutton is held down
         if (HAL_GPIO_ReadPin(GPIOC, BTN_Pin) == GPIO_PIN_RESET) {
             buttonPressed = 1;
-            HAL_TIM_Base_Start_IT(&htim3);
-        } else {
+            HAL_TIM_Base_Start_IT(&htim3); // Start TIM3 interrupt
+        }
+        // When pushbutton is released
+        else {
             buttonPressed = 0;
-            HAL_TIM_Base_Stop_IT(&htim3);
-            HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+            HAL_TIM_Base_Stop_IT(&htim3); // Stop TIM3 interrupt
+            HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1); // Ensure DAC is stopped
         }
     }
 }
@@ -95,11 +98,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     if (htim == &htim3 && buttonPressed) {
         if (playSound) {
+        	// Stop the sound (to create an arpeggio effect while button is held down)
             HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
             playSound = 0;
         } else {
-        	wave = (wave + 1) % 3;
+        	wave = (wave + 1) % 3; // Switch to another waveform
         	uint32_t* sawtoothWave = waves[wave];
+
+        	// Start the sound
             int size = sizes[wave];
             HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, sawtoothWave, size, DAC_ALIGN_12B_R);
             playSound = 1;
@@ -159,25 +165,22 @@ int main(void)
       float p;
       float k;
   };
+  // Adjust parameters for precision
   struct kstate roll_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
   struct kstate pitch_filter = {0.01f, 0.1f, 0.0f, 1.0f, 0.0f};
 
-  for (uint32_t j = 0; j < 110; j++){
-	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
-	  sawtoothWave_1[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  // Sawtooth waveform generation
+  for (uint32_t j = 0; j < 110; j++){ // 400 Hz
+	  sawtoothWave_1[j] = j * 37;
   }
 
-  for (uint32_t j = 0; j < 55; j++){
-  	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
-  	  sawtoothWave_2[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  for (uint32_t j = 0; j < 55; j++){ // 800 Hz
+  	  sawtoothWave_2[j] = j * 74;
   }
 
-  for (uint32_t j = 0; j < 28; j++){
-  	  float scale = 1.0f - ((float)j / (11 - 1)); // Fading factor
-  	  sawtoothWave_3[j] = (uint16_t)(3276 * scale * ((float)j / (11 - 1)));
+  for (uint32_t j = 0; j < 28; j++){ // 1575 Hz
+  	  sawtoothWave_3[j] = j * 146;
   }
-
-
 
   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim2);
@@ -191,30 +194,40 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  // Get accelerometer data (X, Y, Z axes) and store it in acceleroVal array
 	  BSP_ACCELERO_AccGetXYZ(acceleroVal);
 
+	  // Convert raw accelerometer readings to floating-point values for calculations
 	  float ax = (float)acceleroVal[0];
 	  float ay = (float)acceleroVal[1];
 	  float az = (float)acceleroVal[2];
 
+	  // Compute denominator for pitch calculation: sqrt(ay^2 + az^2)
 	  float pitch_denom = sqrtf(ay * ay + az * az);
+	  // Compute denominator for roll calculation: sqrt(ax^2 + az^2)
 	  float roll_denom = sqrtf(ax * ax + az * az);
 
+	  // Calculate pitch angle (in degrees) using arctangent formula
 	  pitch = atan2f(-ax, pitch_denom) * (180.0f / M_PI);
+	  // Calculate roll angle (in degrees) using arctangent formula
 	  roll = atan2f(ay, roll_denom) * (180.0f / M_PI);
 
-	  kalmanFilter_update(&roll_filter, roll);
-	  kalmanFilter_update(&pitch_filter, pitch);
+	  // Update Kalman filters for roll and pitch angles (only update if no floating point exception occurs)
+	  if (kalmanFilter_update(&roll_filter, roll) == 0) {
+		  roll = roll_filter.x;
+	  }
+	  if (kalmanFilter_update(&pitch_filter, pitch) == 0) {
+		  pitch = pitch_filter.x;
+	  }
 
-	  roll = roll_filter.x;
-	  pitch = pitch_filter.x;
-
+	  // Format the roll, pitch, and buttonPressed status into a string for UART transmission
 	  sprintf(output, "Roll: %.2f, Pitch: %.2f, Button: %d\r\n", roll, pitch, buttonPressed);
 
+	  // Transmit the formatted string over UART (timeout of 10 seconds)
 	  int16_t len = strlen(output);
 	  HAL_UART_Transmit(&huart1, (uint8_t*)output, len, 10000);
 
-	  HAL_Delay(100);
+	  HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
