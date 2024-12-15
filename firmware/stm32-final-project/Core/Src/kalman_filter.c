@@ -44,10 +44,5 @@ int kalmanFilter_update(struct kstate* kstate, float measurement){
 	kstate->k = k;
 	kstate->p = p;
 
-	// Check for floating-point exceptions after all operations
-	if (fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW)) {
-		return -1;
-	}
-
 	return 0;
 }

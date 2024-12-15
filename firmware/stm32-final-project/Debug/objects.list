@@ -1,4 +1,3 @@
-"./Core/Src/calibrate_gyro.o"
 "./Core/Src/kalman_filter.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32l4s5i_iot01.o"
